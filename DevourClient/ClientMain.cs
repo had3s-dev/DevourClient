@@ -1,15 +1,16 @@
-﻿using DevourClient.Helpers;
+using DevourClient.Helpers;
 using MelonLoader;
 using System.Threading.Tasks;
 using Il2CppPhoton.Bolt;
 using UnityEngine;
 using Il2Cpp;
+using System.Threading;
 
 namespace DevourClient
 {
     public class ClientMain : MonoBehaviour
     {
-        public ClientMain(IntPtr ptr)
+        public ClientMain(System.IntPtr ptr)
             : base(ptr)
         {
         }
@@ -64,6 +65,12 @@ namespace DevourClient
         static bool should_show_start_message = true;
         static Texture2D crosshairTexture = default!;
 
+        public void OnApplicationStart()
+        {
+            MelonLogger.Msg("DevourClient loaded!");
+            MelonLogger.Msg("Press INSERT to open the menu");
+        }
+
         public void Start()
         {
             MelonLogger.Msg("For the Queen !");
@@ -95,16 +102,22 @@ namespace DevourClient
                 try
                 {
                     Il2Cpp.GameUI gameUI = UnityEngine.Object.FindObjectOfType<Il2Cpp.GameUI>();
-                    if (Settings.Settings.menu_enable)
+                    if (gameUI != null)
                     {
-                        gameUI.HideMouseCursor();
-                    }
-                    else
-                    {
-                        gameUI.ShowMouseCursor();
+                        if (Settings.Settings.menu_enable)
+                        {
+                            gameUI.HideMouseCursor();
+                        }
+                        else
+                        {
+                            gameUI.ShowMouseCursor();
+                        }
                     }
                 }
-                catch { }
+                catch (System.Exception ex)
+                {
+                    MelonLoader.MelonLogger.Warning($"Error toggling menu: {ex.Message}");
+                }
 
                 Settings.Settings.menu_enable = !Settings.Settings.menu_enable;
             }

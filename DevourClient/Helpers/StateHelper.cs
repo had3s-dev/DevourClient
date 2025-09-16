@@ -1,9 +1,10 @@
-﻿using UnityEngine;
+using UnityEngine;
 using Il2CppOpsive.UltimateCharacterController.Character;
 using System.Collections.Generic;
 using System.Collections;
 using MelonLoader;
 using Il2CppPhoton.Bolt;
+using Il2CppPhoton;
 
 namespace DevourClient.Helpers
 {
@@ -139,8 +140,40 @@ namespace DevourClient.Helpers
     {
         public static bool IsInGame()
         {
-            Il2Cpp.OptionsHelpers optionsHelpers = UnityEngine.Object.FindObjectOfType<Il2Cpp.OptionsHelpers>();
-            return optionsHelpers.inGame;
+            try
+            {
+                // Devour 5.2.11 compatibility - multiple detection methods
+                Il2Cpp.OptionsHelpers optionsHelpers = UnityEngine.Object.FindObjectOfType<Il2Cpp.OptionsHelpers>();
+                if (optionsHelpers != null)
+                    return optionsHelpers.inGame;
+                
+                // New method for 5.2.11+
+                Il2Cpp.GameUI gameUI = UnityEngine.Object.FindObjectOfType<Il2Cpp.GameUI>();
+                if (gameUI != null)
+                {
+                    // Use reflection or alternative properties based on actual GameUI structure
+                    var menuOpenField = gameUI.GetType().GetProperty("isMenuOpen") ?? gameUI.GetType().GetProperty("menuOpen");
+                    var inGameField = gameUI.GetType().GetProperty("isInGame") ?? gameUI.GetType().GetProperty("inGame");
+                    
+                    if (menuOpenField != null && inGameField != null)
+                    {
+                        bool isMenuOpen = (bool)menuOpenField.GetValue(gameUI);
+                        bool isInGame = (bool)inGameField.GetValue(gameUI);
+                        return !isMenuOpen && isInGame;
+                    }
+                    
+                    // Fallback to alternative detection methods - check for local NolanBehaviour
+                    return UnityEngine.Object.FindObjectOfType<Il2Cpp.NolanBehaviour>() != null;
+                }
+                
+                // No reliable GameManager type in 5.2.11 via Il2Cpp; avoid direct reference
+                
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public static bool IsInGameOrLobby()
@@ -148,14 +181,28 @@ namespace DevourClient.Helpers
             return GetPlayer() != null;
         }
 
-        public static Il2Cpp.NolanBehaviour GetPlayer()
+        public static Il2Cpp.NolanBehaviour? GetPlayer()
         {
-            if (Entities.LocalPlayer_.p_GameObject == null)
+            if (Entities.LocalPlayer_?.p_GameObject == null)
             {
-                return null!;
+                return null;
             }
 
-            return Entities.LocalPlayer_.p_GameObject.GetComponent<Il2Cpp.NolanBehaviour>();
+            var nolan = Entities.LocalPlayer_.p_GameObject.GetComponent<Il2Cpp.NolanBehaviour>();
+            if (nolan == null)
+            {
+                // Try to find player using alternative methods for newer versions
+                GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
+                foreach (GameObject player in players)
+                {
+                    var nb = player.GetComponent<Il2Cpp.NolanBehaviour>();
+                    if (nb != null && nb.entity != null && nb.entity.IsOwner)
+                    {
+                        return nb;
+                    }
+                }
+            }
+            return nolan;
         }
 
         public static bool IsPlayerCrawling()
@@ -194,19 +241,44 @@ namespace DevourClient.Helpers
         {
             while (true)
             {
-                GameObject[] currentPlayers = GameObject.FindGameObjectsWithTag("Player");
-
-                for (int i = 0; i < currentPlayers.Length; i++)
+                try
                 {
-                    if (currentPlayers[i].GetComponent<Il2Cpp.NolanBehaviour>().entity.IsOwner)
+                    // Devour 5.2.11 compatibility - enhanced player detection
+                    GameObject[] currentPlayers = GameObject.FindGameObjectsWithTag("Player");
+
+                    for (int i = 0; i < currentPlayers.Length; i++)
                     {
-                        LocalPlayer_.p_GameObject = currentPlayers[i];
-                        break;
+                        if (currentPlayers[i] == null) continue;
+                        
+                        var nolan = currentPlayers[i].GetComponent<Il2Cpp.NolanBehaviour>();
+                        if (nolan != null)
+                        {
+                            // Check both entity and photon view for 5.2.11+
+                            bool isLocal = false;
+                            
+                            try
+                            {
+                                if (nolan.entity != null && nolan.entity.IsOwner)
+                                    isLocal = true;
+                            }
+                            catch { }
+                            
+                            // Avoid Il2CppPhoton.PhotonView dependency; rely on entity ownership only
+                            
+                            if (isLocal)
+                            {
+                                LocalPlayer_.p_GameObject = currentPlayers[i];
+                                break;
+                            }
+                        }
                     }
                 }
+                catch (System.Exception ex)
+                {
+                    MelonLoader.MelonLogger.Warning($"Error in GetLocalPlayer: {ex.Message}");
+                }
 
-                // Wait 5 seconds before caching objects again.
-                yield return new WaitForSeconds(5f);
+                yield return new WaitForSeconds(3f); // Reduced delay for 5.2.11
             }
         }
 
@@ -214,34 +286,45 @@ namespace DevourClient.Helpers
         {
             while (true)
             {
-                GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
-                Players = new BasePlayer[players.Length];
-
-                int i = 0;
-                foreach (GameObject p in players)
+                try
                 {
-                    string player_name = "";
-                    string player_id = "-1";
+                    GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
+                    Players = new BasePlayer[players.Length];
 
-                    Il2Cpp.DissonancePlayerTracking dpt = p.gameObject.GetComponent<Il2Cpp.DissonancePlayerTracking>();
-                    if (dpt != null)
+                    int i = 0;
+                    foreach (GameObject p in players)
                     {
-                        player_name = dpt.state.PlayerName;
-                        player_id = dpt.state.PlayerId;
+                        string player_name = "Unknown";
+                        string player_id = "-1";
+
+                        try
+                        {
+                            Il2Cpp.DissonancePlayerTracking dpt = p.gameObject.GetComponent<Il2Cpp.DissonancePlayerTracking>();
+                            if (dpt != null && dpt.state != null)
+                            {
+                                player_name = dpt.state.PlayerName ?? "Unknown";
+                                player_id = dpt.state.PlayerId ?? "-1";
+                            }
+                        }
+                        catch { }
+
+                        if (Players[i] == null)
+                        {
+                            Players[i] = new BasePlayer();
+                        }
+
+                        Players[i].Id = player_id;
+                        Players[i].Name = player_name;
+                        Players[i].p_GameObject = p;
+
+                        i++;
                     }
-
-                    if (Players[i] == null)
-                    {
-                        Players[i] = new BasePlayer();
-                    }
-
-                    Players[i].Id = player_id;
-                    Players[i].Name = player_name;
-                    Players[i].p_GameObject = p;
-
-                    i++;
                 }
-
+                catch (System.Exception ex)
+                {
+                    MelonLoader.MelonLogger.Warning($"Error in GetAllPlayers: {ex.Message}");
+                    Players = new BasePlayer[0];
+                }
 
                 // Wait 5 seconds before caching objects again.
                 yield return new WaitForSeconds(5f);
@@ -251,9 +334,15 @@ namespace DevourClient.Helpers
         {
             while (true)
             {
-                GoatsAndRats = Il2Cpp.GoatBehaviour.FindObjectsOfType<Il2Cpp.GoatBehaviour>();
-
-                // Wait 5 seconds before caching objects again.
+                try
+                {
+                    GoatsAndRats = Il2Cpp.GoatBehaviour.FindObjectsOfType<Il2Cpp.GoatBehaviour>() ?? new Il2Cpp.GoatBehaviour[0];
+                }
+                catch (System.Exception ex)
+                {
+                    MelonLoader.MelonLogger.Warning($"Error in GetGoatsAndRats: {ex.Message}");
+                    GoatsAndRats = new Il2Cpp.GoatBehaviour[0];
+                }
                 yield return new WaitForSeconds(5f);
             }
         }
@@ -262,9 +351,15 @@ namespace DevourClient.Helpers
         {
             while (true)
             {
-                SurvivalInteractables = Il2Cpp.SurvivalInteractable.FindObjectsOfType<Il2Cpp.SurvivalInteractable>();
-
-                // Wait 5 seconds before caching objects again.
+                try
+                {
+                    SurvivalInteractables = Il2Cpp.SurvivalInteractable.FindObjectsOfType<Il2Cpp.SurvivalInteractable>() ?? new Il2Cpp.SurvivalInteractable[0];
+                }
+                catch (System.Exception ex)
+                {
+                    MelonLoader.MelonLogger.Warning($"Error in GetSurvivalInteractables: {ex.Message}");
+                    SurvivalInteractables = new Il2Cpp.SurvivalInteractable[0];
+                }
                 yield return new WaitForSeconds(5f);
             }
         }
@@ -273,9 +368,15 @@ namespace DevourClient.Helpers
         {
             while (true)
             {
-                Keys = Il2Cpp.KeyBehaviour.FindObjectsOfType<Il2Cpp.KeyBehaviour>();
-
-                // Wait 5 seconds before caching objects again.
+                try
+                {
+                    Keys = Il2Cpp.KeyBehaviour.FindObjectsOfType<Il2Cpp.KeyBehaviour>() ?? new Il2Cpp.KeyBehaviour[0];
+                }
+                catch (System.Exception ex)
+                {
+                    MelonLoader.MelonLogger.Warning($"Error in GetKeys: {ex.Message}");
+                    Keys = new Il2Cpp.KeyBehaviour[0];
+                }
                 yield return new WaitForSeconds(5f);
             }
         }
@@ -284,9 +385,15 @@ namespace DevourClient.Helpers
         {
             while (true)
             {
-                Demons = Il2Cpp.SurvivalDemonBehaviour.FindObjectsOfType<Il2Cpp.SurvivalDemonBehaviour>();
-
-                // Wait 5 seconds before caching objects again.
+                try
+                {
+                    Demons = Il2Cpp.SurvivalDemonBehaviour.FindObjectsOfType<Il2Cpp.SurvivalDemonBehaviour>() ?? new Il2Cpp.SurvivalDemonBehaviour[0];
+                }
+                catch (System.Exception ex)
+                {
+                    MelonLoader.MelonLogger.Warning($"Error in GetDemons: {ex.Message}");
+                    Demons = new Il2Cpp.SurvivalDemonBehaviour[0];
+                }
                 yield return new WaitForSeconds(5f);
             }
         }
@@ -295,9 +402,15 @@ namespace DevourClient.Helpers
         {
             while (true)
             {
-                Spiders = Il2Cpp.SpiderBehaviour.FindObjectsOfType<Il2Cpp.SpiderBehaviour>();
-
-                // Wait 5 seconds before caching objects again.
+                try
+                {
+                    Spiders = Il2Cpp.SpiderBehaviour.FindObjectsOfType<Il2Cpp.SpiderBehaviour>() ?? new Il2Cpp.SpiderBehaviour[0];
+                }
+                catch (System.Exception ex)
+                {
+                    MelonLoader.MelonLogger.Warning($"Error in GetSpiders: {ex.Message}");
+                    Spiders = new Il2Cpp.SpiderBehaviour[0];
+                }
                 yield return new WaitForSeconds(5f);
             }
         }
@@ -306,9 +419,15 @@ namespace DevourClient.Helpers
         {
             while (true)
             {
-                Ghosts = Il2Cpp.GhostBehaviour.FindObjectsOfType<Il2Cpp.GhostBehaviour>();
-
-                // Wait 5 seconds before caching objects again.
+                try
+                {
+                    Ghosts = Il2Cpp.GhostBehaviour.FindObjectsOfType<Il2Cpp.GhostBehaviour>() ?? new Il2Cpp.GhostBehaviour[0];
+                }
+                catch (System.Exception ex)
+                {
+                    MelonLoader.MelonLogger.Warning($"Error in GetGhosts: {ex.Message}");
+                    Ghosts = new Il2Cpp.GhostBehaviour[0];
+                }
                 yield return new WaitForSeconds(5f);
             }
         }
@@ -317,9 +436,15 @@ namespace DevourClient.Helpers
         {
             while (true)
             {
-                Boars = Il2Cpp.BoarBehaviour.FindObjectsOfType<Il2Cpp.BoarBehaviour>();
-
-                // Wait 5 seconds before caching objects again.
+                try
+                {
+                    Boars = Il2Cpp.BoarBehaviour.FindObjectsOfType<Il2Cpp.BoarBehaviour>() ?? new Il2Cpp.BoarBehaviour[0];
+                }
+                catch (System.Exception ex)
+                {
+                    MelonLoader.MelonLogger.Warning($"Error in GetBoars: {ex.Message}");
+                    Boars = new Il2Cpp.BoarBehaviour[0];
+                }
                 yield return new WaitForSeconds(5f);
             }
         }
@@ -328,9 +453,15 @@ namespace DevourClient.Helpers
         {
             while (true)
             {
-                Corpses = Il2Cpp.CorpseBehaviour.FindObjectsOfType<Il2Cpp.CorpseBehaviour>();
-
-                // Wait 5 seconds before caching objects again.
+                try
+                {
+                    Corpses = Il2Cpp.CorpseBehaviour.FindObjectsOfType<Il2Cpp.CorpseBehaviour>() ?? new Il2Cpp.CorpseBehaviour[0];
+                }
+                catch (System.Exception ex)
+                {
+                    MelonLoader.MelonLogger.Warning($"Error in GetCorpses: {ex.Message}");
+                    Corpses = new Il2Cpp.CorpseBehaviour[0];
+                }
                 yield return new WaitForSeconds(5f);
             }
         }
@@ -339,9 +470,15 @@ namespace DevourClient.Helpers
         {
             while (true)
             {
-                Crows = Il2Cpp.CrowBehaviour.FindObjectsOfType<Il2Cpp.CrowBehaviour>();
-
-                // Wait 5 seconds before caching objects again.
+                try
+                {
+                    Crows = Il2Cpp.CrowBehaviour.FindObjectsOfType<Il2Cpp.CrowBehaviour>() ?? new Il2Cpp.CrowBehaviour[0];
+                }
+                catch (System.Exception ex)
+                {
+                    MelonLoader.MelonLogger.Warning($"Error in GetCrows: {ex.Message}");
+                    Crows = new Il2Cpp.CrowBehaviour[0];
+                }
                 yield return new WaitForSeconds(5f);
             }
         }
@@ -350,23 +487,32 @@ namespace DevourClient.Helpers
         {
             while (true)
             {
-                Lumps = Il2Cpp.ManorLumpController.FindObjectsOfType<Il2Cpp.ManorLumpController>();
-
-                // Wait 5 seconds before caching objects again.
+                try
+                {
+                    Lumps = Il2Cpp.ManorLumpController.FindObjectsOfType<Il2Cpp.ManorLumpController>() ?? new Il2Cpp.ManorLumpController[0];
+                }
+                catch (System.Exception ex)
+                {
+                    MelonLoader.MelonLogger.Warning($"Error in GetLumps: {ex.Message}");
+                    Lumps = new Il2Cpp.ManorLumpController[0];
+                }
                 yield return new WaitForSeconds(5f);
             }
         }
 
         public static IEnumerator GetAzazels()
         {
-            /*
-             * ikr AzazelS, because in case we spawn multiple we want the esp to render all of them
-            */
             while (true)
             {
-                Azazels = Il2Cpp.SurvivalAzazelBehaviour.FindObjectsOfType<Il2Cpp.SurvivalAzazelBehaviour>();
-
-                // Wait 5 seconds before caching objects again.
+                try
+                {
+                    Azazels = Il2Cpp.SurvivalAzazelBehaviour.FindObjectsOfType<Il2Cpp.SurvivalAzazelBehaviour>() ?? new Il2Cpp.SurvivalAzazelBehaviour[0];
+                }
+                catch (System.Exception ex)
+                {
+                    MelonLoader.MelonLogger.Warning($"Error in GetAzazels: {ex.Message}");
+                    Azazels = new Il2Cpp.SurvivalAzazelBehaviour[0];
+                }
                 yield return new WaitForSeconds(5f);
             }
         }

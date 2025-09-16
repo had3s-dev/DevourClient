@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using MelonLoader;
 using UnityEngine.UI;
 using System.Reflection;
@@ -253,32 +253,52 @@ namespace DevourClient.Hacks
 
 		public static void BigFlashlight(bool reset)
         {
-			Il2Cpp.NolanBehaviour Nolan = Player.GetPlayer();
-			if (Nolan == null)
+            try
             {
-				return;
-            }
+                Il2Cpp.NolanBehaviour Nolan = Player.GetPlayer();
+                if (Nolan == null)
+                {
+                    return;
+                }
 
-			Light flashlightSpot = Nolan.flashlightSpot;
-			if (flashlightSpot == null)
+                // Devour 5.2.11 compatibility - enhanced flashlight detection
+                Light flashlightSpot = Nolan.flashlightSpot;
+                if (flashlightSpot == null)
+                {
+                    // Search for flashlight in children with new naming patterns
+                    Light[] lights = Nolan.GetComponentsInChildren<Light>();
+                    foreach (Light light in lights)
+                    {
+                        if (light != null && (light.name.Contains("Flashlight") || light.name.Contains("flashlight") || light.type == LightType.Spot))
+                        {
+                            flashlightSpot = light;
+                            break;
+                        }
+                    }
+                    
+                    if (flashlightSpot == null)
+                        return;
+                }
+
+                if (reset)
+                {
+                    flashlightSpot.intensity = 1.4f;
+                    flashlightSpot.range = 9f;
+                    flashlightSpot.spotAngle = 70f;
+                    flashlightSpot.type = LightType.Spot;
+                }
+                else
+                {
+                    flashlightSpot.intensity = 2.5f; // Increased for 5.2.11
+                    flashlightSpot.range = 250f; // Increased range
+                    flashlightSpot.spotAngle = 120f; // Wider angle
+                }
+            }
+            catch (System.Exception ex)
             {
-				return;
+                MelonLoader.MelonLogger.Warning($"Error in BigFlashlight: {ex.Message}");
             }
-
-			if (reset)
-			{
-				flashlightSpot.intensity = 1.4f;
-				flashlightSpot.range = 9f;
-				flashlightSpot.spotAngle = 70f;
-			}
-			else
-			{
-				flashlightSpot.intensity = 1.1f;
-				flashlightSpot.range = 200f;
-				flashlightSpot.spotAngle = 90f;
-			}
-			
-		}
+        }
 
 		public static List<Transform> GetAllBones(Animator a)
 		{
