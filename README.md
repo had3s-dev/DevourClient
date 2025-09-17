@@ -109,7 +109,7 @@ In order to get all of this working you need to generate the DevourClient.dll fi
 
 ## Contact
 
-You can add me on discord at _.patate or on the [discord server](https://discord.gg/2amMFvqjYd)
+You can add me on discord at clairesbottomsurgery
 
 ## Code used
 
@@ -139,5 +139,6 @@ Open an [issue](https://github.com/ALittlePatate/DevourClient/issues/new) or mak
 ## License
 
 [GPL 3.0](https://www.gnu.org/licenses/gpl-3.0.md)
+
 
 
