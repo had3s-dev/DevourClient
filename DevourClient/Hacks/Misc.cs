@@ -13,6 +13,11 @@ namespace DevourClient.Hacks
 {
     public class Misc
     {
+        // Throttle flags for noisy errors
+        private static bool _loggedMissingVoiceOnce = false;
+        private static bool _loggedMoanFailOnce = false;
+        private static bool _loggedScreamFailOnce = false;
+
 		public static void Fly(float speed) //normal speed 5f
 		{
 			Il2Cpp.NolanBehaviour nb = Player.GetPlayer();
@@ -197,7 +202,7 @@ namespace DevourClient.Hacks
 			_reviveInteractable.Interact(nb.gameObject);
 		}
 		public static void TPItems()
-		{
+        {
             Il2Cpp.NolanBehaviour Nolan = Player.GetPlayer();
 
             foreach (Il2Cpp.SurvivalInteractable item in Helpers.Entities.SurvivalInteractables)
@@ -503,47 +508,92 @@ namespace DevourClient.Hacks
 		
 		public static void PlaySound()
         {
-			Il2Cpp.PlayRandomAudioClip playRandomAudioClip = UnityEngine.Object.FindObjectOfType<Il2Cpp.PlayRandomAudioClip>();
-			Il2Cpp.NolanVoiceOvers nolanVoiceOvers = UnityEngine.Object.FindObjectOfType<Il2Cpp.NolanVoiceOvers>();
-			playRandomAudioClip.delay = 0f;
+            Il2Cpp.PlayRandomAudioClip playRandomAudioClip = UnityEngine.Object.FindObjectOfType<Il2Cpp.PlayRandomAudioClip>();
+            Il2Cpp.NolanVoiceOvers nolanVoiceOvers = UnityEngine.Object.FindObjectOfType<Il2Cpp.NolanVoiceOvers>();
 
-			int num = UnityEngine.Random.RandomRangeInt(0, 10);
-			switch (num)
+            if (playRandomAudioClip != null)
+                playRandomAudioClip.delay = 0f;
+
+            if (nolanVoiceOvers == null)
             {
-				case 0:
-					nolanVoiceOvers.yesClips.Play();
-					return;
-				case 1:
-					nolanVoiceOvers.noClips.Play();
-					return;
-				case 2:
-					nolanVoiceOvers.beckonClips.Play();
-					return;
-				case 3:
-					nolanVoiceOvers.showOffClips.Play();
-					return;
-				case 4:
-					nolanVoiceOvers.screamClips.Play();
-					return;
-				case 5:
-					nolanVoiceOvers.pickupClips.Play();
-					return;
-				case 6:
-					nolanVoiceOvers.burnGoatClips.Play();
-					return;
-				case 7:
-					nolanVoiceOvers.laughClips.Play();
-					return;
-				case 8:
-					nolanVoiceOvers.PlayMoan();
-					return;
-				case 9:
-					nolanVoiceOvers.Scream();
-					return;
-				default:
-					return;
+                if (!_loggedMissingVoiceOnce)
+                {
+                    MelonLogger.Warning("NolanVoiceOvers not found. Skipping PlaySound.");
+                    _loggedMissingVoiceOnce = true;
+                }
+                return;
             }
-		}
+
+            // Prefer safe clip groups; avoid risky direct methods unless they succeed
+            int num = UnityEngine.Random.RandomRangeInt(0, 8); // limit to 0..7 to avoid moan/scream direct calls by default
+            try
+            {
+                switch (num)
+                {
+                    case 0:
+                        if (nolanVoiceOvers.yesClips != null) nolanVoiceOvers.yesClips.Play();
+                        break;
+                    case 1:
+                        if (nolanVoiceOvers.noClips != null) nolanVoiceOvers.noClips.Play();
+                        break;
+                    case 2:
+                        if (nolanVoiceOvers.beckonClips != null) nolanVoiceOvers.beckonClips.Play();
+                        break;
+                    case 3:
+                        if (nolanVoiceOvers.showOffClips != null) nolanVoiceOvers.showOffClips.Play();
+                        break;
+                    case 4:
+                        if (nolanVoiceOvers.screamClips != null) nolanVoiceOvers.screamClips.Play();
+                        break;
+                    case 5:
+                        if (nolanVoiceOvers.pickupClips != null) nolanVoiceOvers.pickupClips.Play();
+                        break;
+                    case 6:
+                        if (nolanVoiceOvers.burnGoatClips != null) nolanVoiceOvers.burnGoatClips.Play();
+                        break;
+                    case 7:
+                        if (nolanVoiceOvers.laughClips != null) nolanVoiceOvers.laughClips.Play();
+                        break;
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Warning($"PlaySound clip error: {ex.Message}");
+            }
+
+            // Occasionally try the direct methods, but guard with try/catch to avoid NRE spam
+            if (UnityEngine.Random.RandomRangeInt(0, 20) == 0) // 1 in 20 chance
+            {
+                try
+                {
+                    nolanVoiceOvers.PlayMoan();
+                }
+                catch (System.Exception ex)
+                {
+                    if (!_loggedMoanFailOnce)
+                    {
+                        MelonLogger.Warning($"PlayMoan failed: {ex.Message}");
+                        _loggedMoanFailOnce = true;
+                    }
+                }
+            }
+
+            if (UnityEngine.Random.RandomRangeInt(0, 20) == 0) // 1 in 20 chance
+            {
+                try
+                {
+                    nolanVoiceOvers.Scream();
+                }
+                catch (System.Exception ex)
+                {
+                    if (!_loggedScreamFailOnce)
+                    {
+                        MelonLogger.Warning($"Scream failed: {ex.Message}");
+                        _loggedScreamFailOnce = true;
+                    }
+                }
+            }
+        }
 		
 		public static void FreezeAzazel()
 		{

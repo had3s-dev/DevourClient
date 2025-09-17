@@ -21,6 +21,13 @@ namespace DevourClient.Helpers
                 return;
             }
 
+            // Prevent client from raising server-only events
+            if (!BoltNetwork.IsServer)
+            {
+                MelonLogger.Msg("You need to be server !");
+                return;
+            }
+
             Il2Cpp.SurvivalAzazelBehaviour sab = Il2Cpp.SurvivalAzazelBehaviour.FindObjectOfType<Il2Cpp.SurvivalAzazelBehaviour>();
 
             if (sab == null)
@@ -78,6 +85,13 @@ namespace DevourClient.Helpers
         {
             if (p_GameObject == null)
             {
+                return;
+            }
+
+            // Only server can instantiate networked prefabs
+            if (!BoltNetwork.IsServer)
+            {
+                MelonLogger.Msg("You need to be server !");
                 return;
             }
 

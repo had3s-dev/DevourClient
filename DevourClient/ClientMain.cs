@@ -55,6 +55,9 @@ namespace DevourClient
         static bool azazel_skel_esp = false;
         static bool azazel_snapline = false;
         static bool spam_message = false;
+        // Throttle for chat spam to avoid log flooding and excessive calls
+        static float _spamIntervalSeconds = 0.5f;
+        static float _lastSpamTime = 0f;
         static bool item_esp = false;
         static bool goat_rat_esp = false;
         static bool demon_esp = false;
@@ -172,8 +175,13 @@ namespace DevourClient
 
             if (spam_message)
             {
-                MelonLogger.Msg("done");
-                Hacks.Misc.MessageSpam(Settings.Settings.message_to_spam);
+                if (Time.time - _lastSpamTime >= _spamIntervalSeconds)
+                {
+                    // Keep logs minimal to reduce noise
+                    // MelonLogger.Msg("chat spam tick");
+                    Hacks.Misc.MessageSpam(Settings.Settings.message_to_spam);
+                    _lastSpamTime = Time.time;
+                }
             }
 
             if (spoofLevel)
@@ -531,73 +539,75 @@ namespace DevourClient
             GUI.Label(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 150, 120, 30), "Azazel & Demons");
 
             // azazel
+            GUI.enabled = Player.IsInGameOrLobby() && BoltNetwork.IsServer;
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 180, 60, 25), "Sam") && Player.IsInGameOrLobby() && BoltNetwork.IsServer)
+            if (GUI.Button(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 180, 60, 25), "Sam"))
             {
                 Hacks.Misc.SpawnAzazel((PrefabId)BoltPrefabs.AzazelSam);
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 80, Settings.Settings.y + 180, 60, 25), "Molly") && Player.IsInGameOrLobby() && BoltNetwork.IsServer)
+            if (GUI.Button(new Rect(Settings.Settings.x + 80, Settings.Settings.y + 180, 60, 25), "Molly"))
             {
                 Hacks.Misc.SpawnAzazel((PrefabId)BoltPrefabs.SurvivalAzazelMolly);
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 150, Settings.Settings.y + 180, 60, 25), "Anna") && Player.IsInGameOrLobby() && BoltNetwork.IsServer)
+            if (GUI.Button(new Rect(Settings.Settings.x + 150, Settings.Settings.y + 180, 60, 25), "Anna"))
             {
                 BoltNetwork.Instantiate(BoltPrefabs.SurvivalAnnaNew, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 220, Settings.Settings.y + 180, 60, 25), "Zara") && Player.IsInGameOrLobby() && BoltNetwork.IsServer)
+            if (GUI.Button(new Rect(Settings.Settings.x + 220, Settings.Settings.y + 180, 60, 25), "Zara"))
             {
                 BoltNetwork.Instantiate(BoltPrefabs.AzazelZara, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 290, Settings.Settings.y + 180, 60, 25), "Nathan") && Player.IsInGameOrLobby() && BoltNetwork.IsServer)
+            if (GUI.Button(new Rect(Settings.Settings.x + 290, Settings.Settings.y + 180, 60, 25), "Nathan"))
             {
                 BoltNetwork.Instantiate(BoltPrefabs.AzazelNathan, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 360, Settings.Settings.y + 180, 60, 25), "April") && Player.IsInGameOrLobby() && BoltNetwork.IsServer)
+            if (GUI.Button(new Rect(Settings.Settings.x + 360, Settings.Settings.y + 180, 60, 25), "April"))
             {
                 BoltNetwork.Instantiate(BoltPrefabs.AzazelApril, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             // demon
-
-            if (GUI.Button(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 220, 60, 25), "Ghost") && Player.IsInGameOrLobby() && BoltNetwork.IsServer)
+            if (GUI.Button(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 220, 60, 25), "Ghost"))
             {
                 BoltNetwork.Instantiate(BoltPrefabs.Ghost, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 80, Settings.Settings.y + 220, 60, 25), "Inmate") && Player.IsInGameOrLobby() && BoltNetwork.IsServer)
+            if (GUI.Button(new Rect(Settings.Settings.x + 80, Settings.Settings.y + 220, 60, 25), "Inmate"))
             {
                 BoltNetwork.Instantiate(BoltPrefabs.SurvivalInmate, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 150, Settings.Settings.y + 220, 60, 25), "Demon") && Player.IsInGameOrLobby() && BoltNetwork.IsServer)
+            if (GUI.Button(new Rect(Settings.Settings.x + 150, Settings.Settings.y + 220, 60, 25), "Demon"))
             {
                 BoltNetwork.Instantiate(BoltPrefabs.SurvivalDemon, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 220, Settings.Settings.y + 220, 60, 25), "Boar") && Player.IsInGameOrLobby() && BoltNetwork.IsServer)
+            if (GUI.Button(new Rect(Settings.Settings.x + 220, Settings.Settings.y + 220, 60, 25), "Boar"))
             {
                 BoltNetwork.Instantiate(BoltPrefabs.Boar, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 290, Settings.Settings.y + 220, 60, 25), "Corpse") && BoltNetwork.IsServer && Player.IsInGameOrLobby())
+            if (GUI.Button(new Rect(Settings.Settings.x + 290, Settings.Settings.y + 220, 60, 25), "Corpse"))
             {
                 BoltNetwork.Instantiate(BoltPrefabs.Corpse, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 360, Settings.Settings.y + 220, 60, 25), "Crow") && BoltNetwork.IsServer && Player.IsInGameOrLobby())
+            if (GUI.Button(new Rect(Settings.Settings.x + 360, Settings.Settings.y + 220, 60, 25), "Crow"))
             {
                 BoltNetwork.Instantiate(BoltPrefabs.Crow, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 430, Settings.Settings.y + 220, 60, 25), "Lump") && BoltNetwork.IsServer && Player.IsInGameOrLobby())
+            if (GUI.Button(new Rect(Settings.Settings.x + 430, Settings.Settings.y + 220, 60, 25), "Lump"))
             {
                 BoltNetwork.Instantiate(BoltPrefabs.ManorLump, Player.GetPlayer().transform.position, Quaternion.identity);
             }
+
+            GUI.enabled = true;
 
             // Animal
 
@@ -614,23 +624,12 @@ namespace DevourClient
                 }
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 80, Settings.Settings.y + 260, 60, 25), "Goat"))
-            {
-                if (BoltNetwork.IsServer && !Player.IsInGame())
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.SurvivalGoat, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
-
-                if (Player.IsInGame() && !Player.IsPlayerCrawling())
-                {
-                    Hacks.Misc.CarryObject("SurvivalGoat");
-                }
-            }
-
-            if (GUI.Button(new Rect(Settings.Settings.x + 150, Settings.Settings.y + 260, 60, 25), "Spider") && BoltNetwork.IsServer && Player.IsInGameOrLobby())
+            GUI.enabled = BoltNetwork.IsServer && Player.IsInGameOrLobby();
+            if (GUI.Button(new Rect(Settings.Settings.x + 150, Settings.Settings.y + 260, 60, 25), "Spider"))
             {
                 BoltNetwork.Instantiate(BoltPrefabs.Spider, Player.GetPlayer().transform.position, Quaternion.identity);
             }
+            GUI.enabled = true;
 
             if (GUI.Button(new Rect(Settings.Settings.x + 220, Settings.Settings.y + 260, 60, 25), "Pig"))
             {
@@ -643,7 +642,7 @@ namespace DevourClient
                 {
                     Hacks.Misc.CarryObject("SurvivalPig");
                 }
-            }    
+            }
         }
 
         private static void MapSpecificTab()
@@ -667,11 +666,13 @@ namespace DevourClient
             switch (Helpers.Map.GetActiveScene())
             {
                 case "Menu":
-                    if (GUI.Button(new Rect(Settings.Settings.x + 190, Settings.Settings.y + 70, 150, 30), "Force Start Game") && BoltNetwork.IsServer && !Player.IsInGame())
+                    GUI.enabled = BoltNetwork.IsServer && !Player.IsInGame();
+                    if (GUI.Button(new Rect(Settings.Settings.x + 190, Settings.Settings.y + 70, 150, 30), "Force Start Game"))
                     {
                         Il2CppHorror.Menu menu = UnityEngine.Object.FindObjectOfType<Il2CppHorror.Menu>();
                         menu.OnLobbyStartButtonClick();
                     }
+                    GUI.enabled = true;
                     break;
 
                 case "Devour":
@@ -880,37 +881,39 @@ namespace DevourClient
 
             // load map
             GUI.Label(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 210, 100, 30), "Load Map: ");
+            GUI.enabled = BoltNetwork.IsServer;
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 240, 100, 30), "Farmhouse") && BoltNetwork.IsServer)
+            if (GUI.Button(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 240, 100, 30), "Farmhouse"))
             {
                 Helpers.Map.LoadMap("Devour");
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 120, Settings.Settings.y + 240, 100, 30), "Asylum") && BoltNetwork.IsServer)
+            if (GUI.Button(new Rect(Settings.Settings.x + 120, Settings.Settings.y + 240, 100, 30), "Asylum"))
             {
                 Helpers.Map.LoadMap("Molly");
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 230, Settings.Settings.y + 240, 100, 30), "Inn") && BoltNetwork.IsServer)
+            if (GUI.Button(new Rect(Settings.Settings.x + 230, Settings.Settings.y + 240, 100, 30), "Inn"))
             {
                 Helpers.Map.LoadMap("Inn");
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 340, Settings.Settings.y + 240, 100, 30), "Town") && BoltNetwork.IsServer)
+            if (GUI.Button(new Rect(Settings.Settings.x + 340, Settings.Settings.y + 240, 100, 30), "Town"))
             {
                 Helpers.Map.LoadMap("Town");
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 450, Settings.Settings.y + 240, 100, 30), "Slaughterhouse") && BoltNetwork.IsServer)
+            if (GUI.Button(new Rect(Settings.Settings.x + 450, Settings.Settings.y + 240, 100, 30), "Slaughterhouse"))
             {
                 Helpers.Map.LoadMap("Slaughterhouse");
             }
 
-            if (GUI.Button(new Rect(Settings.Settings.x + 560, Settings.Settings.y + 240, 100, 30), "Manor") && BoltNetwork.IsServer)
+            if (GUI.Button(new Rect(Settings.Settings.x + 560, Settings.Settings.y + 240, 100, 30), "Manor"))
             {
                 Helpers.Map.LoadMap("Manor");
             }
 
+            GUI.enabled = true;
         }
 
         private static void EspTab()
@@ -1161,7 +1164,7 @@ namespace DevourClient
                     Hacks.Misc.CarryObject("RitualBook-Active-1");
                 }
             }
-     
+
             if (GUILayout.Button("Dirty head"))
             {
                 if (BoltNetwork.IsServer && !Player.IsInGame())
@@ -1194,281 +1197,179 @@ namespace DevourClient
             GUILayout.Label("Spawnable Prefabs");
 
             Settings.Settings.stuffsScrollPosition = GUILayout.BeginScrollView(Settings.Settings.stuffsScrollPosition, GUILayout.Width(220), GUILayout.Height(190));
+            GUI.enabled = BoltNetwork.IsServer;
 
             if (GUILayout.Button("Animal_Gate"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.Animal_Gate, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.Animal_Gate, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("AsylumDoor"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.AsylumDoor, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.AsylumDoor, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("AsylumDoubleDoor"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.AsylumDoubleDoor, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.AsylumDoubleDoor, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("AsylumWhiteDoor"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.AsylumWhiteDoor, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.AsylumWhiteDoor, Player.GetPlayer().transform.position, Quaternion.identity);
             }
-
 
             if (GUILayout.Button("DevourDoorBack"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.DevourDoorBack, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.DevourDoorBack, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("DevourDoorMain"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.DevourDoorMain, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.DevourDoorMain, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("DevourDoorRoom"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.DevourDoorRoom, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.DevourDoorRoom, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("Elevator_Door"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.Elevator_Door, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.Elevator_Door, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("InnDoor"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.InnDoor, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.InnDoor, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("InnDoubleDoor"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.InnDoubleDoor, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.InnDoubleDoor, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("InnShojiDoor"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.InnShojiDoor, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.InnShojiDoor, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("InnShrine"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.InnShrine, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.InnShrine, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("InnWardrobe"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.InnWardrobe, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.InnWardrobe, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("InnWoodenDoor"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.InnWoodenDoor, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.InnWoodenDoor, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("PigExcrement"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.PigExcrement, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.PigExcrement, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("SlaughterhouseFireEscapeDoor"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.SlaughterhouseFireEscapeDoor, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.SlaughterhouseFireEscapeDoor, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("SurvivalAltarMolly"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.SurvivalAltarMolly, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.SurvivalAltarMolly, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("SurvivalAltarSlaughterhouse"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.SurvivalAltarSlaughterhouse, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.SurvivalAltarSlaughterhouse, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("SurvivalAltarTown"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.SurvivalAltarTown, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.SurvivalAltarTown, Player.GetPlayer().transform.position, Quaternion.identity);
             }
-
 
             if (GUILayout.Button("SurvivalCultist"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.SurvivalCultist, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.SurvivalCultist, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("SurvivalKai"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.SurvivalKai, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.SurvivalKai, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("SurvivalNathan"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.SurvivalNathan, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.SurvivalNathan, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("SurvivalMolly"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.SurvivalMolly, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.SurvivalMolly, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("SurvivalApril"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.SurvivalApril, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.SurvivalApril, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("SurvivalFrank"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.SurvivalFrank, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.SurvivalFrank, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("SurvivalRose"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.SurvivalRose, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.SurvivalRose, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("SurvivalSmashableWindow"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.SurvivalSmashableWindow, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.SurvivalSmashableWindow, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("TownDoor"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.TownDoor, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.TownDoor, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("TownDoor2"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.TownDoor2, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.TownDoor2, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("TownPentagram"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.TownPentagram, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.TownPentagram, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("TrashCan"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.TrashCan, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.TrashCan, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("Truck_Shutter"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.Truck_Shutter, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.Truck_Shutter, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("TV"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.TV, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.TV, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
             if (GUILayout.Button("Mirror"))
             {
-                if (BoltNetwork.IsServer)
-                {
-                    BoltNetwork.Instantiate(BoltPrefabs.ManorMirror, Player.GetPlayer().transform.position, Quaternion.identity);
-                }
+                BoltNetwork.Instantiate(BoltPrefabs.ManorMirror, Player.GetPlayer().transform.position, Quaternion.identity);
             }
 
+            GUI.enabled = true;
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
             GUILayout.EndHorizontal();
@@ -1561,6 +1462,7 @@ namespace DevourClient
 
                     GUI.Label(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 110 + i, 150, 30), bp.Name);
 
+                    GUI.enabled = BoltNetwork.IsServer;
                     if (GUI.Button(new Rect(Settings.Settings.x + 70, Settings.Settings.y + 105 + i, 60, 30), "Kill"))
                     {
                         bp.Kill();
@@ -1586,6 +1488,8 @@ namespace DevourClient
                         bp.LockInCage();
                     }
 
+                    GUI.enabled = true;
+
                     if (GUI.Button(new Rect(Settings.Settings.x + 490, Settings.Settings.y + 105 + i, 90, 30), "TP Azazel"))
                     {
                         bp.TPAzazel();
@@ -1593,10 +1497,12 @@ namespace DevourClient
 
                     if (Helpers.Map.GetActiveScene() == "Town")
                     {
+                        GUI.enabled = BoltNetwork.IsServer;
                         if (GUI.Button(new Rect(Settings.Settings.x + 590, Settings.Settings.y + 105 + i, 90, 30), "Shoot Player"))
                         {
                             bp.ShootPlayer();
                         }
+                        GUI.enabled = true;
                     }
 
                     i += 30;
