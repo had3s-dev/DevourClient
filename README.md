@@ -72,7 +72,7 @@ In order to get all of this working you need to generate the DevourClient.dll fi
 
 0. Delete the folders `MelonLoader`, `Mods`, `Plugins`, `UserData`, and the file `version.dll` from `C:\Program Files (x86)\Steam\steamapps\common\Devour`
 
-## Building from source
+## Building from source [BUILD.BAT SHLD AUTO IMPORT ALL THE REFERNCES NEEDED IN VS]
 
 0. Clone the repository (or Code -> Download Zip)
 1. Install [.NET 6 SDK and runtime](https://dotnet.microsoft.com/en-us/download/dotnet/6.0).
@@ -139,4 +139,5 @@ Open an [issue](https://github.com/ALittlePatate/DevourClient/issues/new) or mak
 ## License
 
 [GPL 3.0](https://www.gnu.org/licenses/gpl-3.0.md)
+
 
