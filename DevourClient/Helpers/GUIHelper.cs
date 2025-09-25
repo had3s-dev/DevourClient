@@ -7,6 +7,7 @@ namespace DevourClient.Helpers
         private static float R;
         private static float G;
         private static float B;
+        private static string _tooltip = null;
 
         public static Color ColorPick(string title, Color color)
         {
@@ -71,6 +72,25 @@ namespace DevourClient.Helpers
             texture.Apply();
 
             return texture;
+        }
+
+        // Simple tooltip system
+        public static void Tooltip(Rect triggerRect, string message)
+        {
+            if (triggerRect.Contains(Event.current.mousePosition))
+            {
+                _tooltip = message;
+            }
+        }
+
+        public static void DrawTooltip()
+        {
+            if (string.IsNullOrEmpty(_tooltip)) return;
+            Vector2 mouse = Event.current.mousePosition;
+            var style = new GUIStyle(GUI.skin.box);
+            style.wordWrap = true;
+            GUI.Box(new Rect(mouse.x + 15, mouse.y + 15, 260, 60), _tooltip, style);
+            _tooltip = null;
         }
     }
 }

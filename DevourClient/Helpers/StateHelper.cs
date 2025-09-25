@@ -5,6 +5,7 @@ using System.Collections;
 using MelonLoader;
 using Il2CppPhoton.Bolt;
 using Il2CppPhoton;
+using System.Linq;
 
 namespace DevourClient.Helpers
 {
@@ -303,11 +304,11 @@ namespace DevourClient.Helpers
                 try
                 {
                     GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
-                    Players = new BasePlayer[players.Length];
-
-                    int i = 0;
+                    // Build list first so we can sort by name
+                    List<BasePlayer> list = new List<BasePlayer>(players.Length);
                     foreach (GameObject p in players)
                     {
+                        if (p == null) continue;
                         string player_name = "Unknown";
                         string player_id = "-1";
 
@@ -322,17 +323,19 @@ namespace DevourClient.Helpers
                         }
                         catch { }
 
-                        if (Players[i] == null)
-                        {
-                            Players[i] = new BasePlayer();
-                        }
-
-                        Players[i].Id = player_id;
-                        Players[i].Name = player_name;
-                        Players[i].p_GameObject = p;
-
-                        i++;
+                        BasePlayer bp = new BasePlayer();
+                        bp.Id = player_id;
+                        bp.Name = player_name;
+                        bp.p_GameObject = p;
+                        list.Add(bp);
                     }
+
+                    // Sort by name, then id fallback
+                    list = list.OrderBy(b => string.IsNullOrEmpty(b.Name) ? "~" : b.Name)
+                               .ThenBy(b => b.Id)
+                               .ToList();
+
+                    Players = list.ToArray();
                 }
                 catch (System.Exception ex)
                 {

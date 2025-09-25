@@ -27,7 +27,7 @@ namespace DevourClient
             Players = 6
         }
 
-        static Rect windowRect = new Rect(Settings.Settings.x + 10, Settings.Settings.y + 10, 700, 700);
+        static Rect windowRect = new Rect(Settings.Settings.x + 10, Settings.Settings.y + 10, 800, 780);
         static CurrentTab current_tab = CurrentTab.Visuals;
 
         static bool flashlight_toggle = false;
@@ -52,9 +52,11 @@ namespace DevourClient
         static bool player_esp = false;
         static bool player_skel_esp = false;
         static bool player_snapline = false;
+        static bool player_nameplate_info = false;
         static bool azazel_esp = false;
         static bool azazel_skel_esp = false;
         static bool azazel_snapline = false;
+        static float _lastEspDrawTime = 0f;
         static bool spam_message = false;
         // Throttle for chat spam to avoid log flooding and excessive calls
         static float _spamIntervalSeconds = 0.5f;
@@ -68,6 +70,11 @@ namespace DevourClient
         static bool in_game_cache = false;
         static bool should_show_start_message = true;
         static Texture2D crosshairTexture = default!;
+        static bool captureFlyKey = false;
+        static bool captureEspKey = false;
+        static bool captureSpeedKey = false;
+        static bool showLobbySection = false;
+        static bool showRiskySection = false;
 
         public void OnApplicationStart()
         {
@@ -127,6 +134,14 @@ namespace DevourClient
                 }
 
                 Settings.Settings.menu_enable = !Settings.Settings.menu_enable;
+            }
+
+            // ESP hotkey toggle
+            if (Input.GetKeyDown(Settings.Settings.espToggleKey))
+            {
+                player_esp = !player_esp;
+                player_skel_esp = player_esp ? player_skel_esp : false;
+                player_snapline = player_esp ? player_snapline : false;
             }
 
             if (Player.IsInGame())
@@ -233,6 +248,11 @@ namespace DevourClient
                     Hacks.Misc.Fly(fly_speed);
                 }
 
+                if (Input.GetKeyDown(Settings.Settings.speedToggleKey))
+                {
+                    fastMove = !fastMove;
+                }
+
             }
 
             if (Helpers.Map.GetActiveScene() == "Menu")
@@ -252,6 +272,32 @@ namespace DevourClient
 
         public void OnGUI()
         {
+            // Handle key capture for hotkeys
+            if (Settings.Settings.menu_enable)
+            {
+                UnityEngine.Event e = UnityEngine.Event.current;
+                if (e != null && e.type == EventType.KeyDown)
+                {
+                    if (captureFlyKey)
+                    {
+                        Settings.Settings.flyKey = e.keyCode;
+                        captureFlyKey = false;
+                        e.Use();
+                    }
+                    else if (captureEspKey)
+                    {
+                        Settings.Settings.espToggleKey = e.keyCode;
+                        captureEspKey = false;
+                        e.Use();
+                    }
+                    else if (captureSpeedKey)
+                    {
+                        Settings.Settings.speedToggleKey = e.keyCode;
+                        captureSpeedKey = false;
+                        e.Use();
+                    }
+                }
+            }
             if (should_show_start_message)
             {
                 if (DevourClient.Hacks.Misc.ShowMessageBox("Welcome to DevourClient.\n\nPress the INS key to open the menu.") == 0)
@@ -260,17 +306,28 @@ namespace DevourClient
 
             GUI.backgroundColor = Color.grey;
 
-            GUI.skin.button.normal.background = GUIHelper.MakeTex(2, 2, Color.black);
+            // Theme
+            GUI.skin.button.normal.background = GUIHelper.MakeTex(2, 2, new Color(0.12f, 0.12f, 0.12f, 1f));
             GUI.skin.button.normal.textColor = Color.white;
 
-            GUI.skin.button.hover.background = GUIHelper.MakeTex(2, 2, Color.green);
-            GUI.skin.button.hover.textColor = Color.black;
+            GUI.skin.button.hover.background = GUIHelper.MakeTex(2, 2, new Color(0.2f, 0.5f, 0.2f, 1f));
+            GUI.skin.button.hover.textColor = Color.white;
 
             GUI.skin.toggle.onNormal.textColor = Color.yellow;
 
             //from https://www.unknowncheats.me/forum/unity/437277-mono-internal-optimisation-tips.html
             if (UnityEngine.Event.current.type == EventType.Repaint)
             {
+                // Throttle ESP draw if configured
+                if (Settings.Settings.espDrawIntervalMs > 0f)
+                {
+                    if (Time.time * 1000f - _lastEspDrawTime < Settings.Settings.espDrawIntervalMs)
+                    {
+                        return;
+                    }
+                    _lastEspDrawTime = Time.time * 1000f;
+                }
+
                 if (player_esp || player_snapline || player_skel_esp)
                 {
                     foreach (Helpers.BasePlayer p in Helpers.Entities.Players)
@@ -289,12 +346,27 @@ namespace DevourClient
                                 continue;
                             }
 
+                            if (Camera.main != null && (Settings.Settings.espDistanceCulling || Settings.Settings.cullPlayers))
+                            {
+                                float dist = Vector3.Distance(Camera.main.transform.position, player.transform.position);
+                                float cap = Settings.Settings.cullPlayers ? Settings.Settings.maxDistPlayers : Settings.Settings.espMaxDistance;
+                                if (dist > cap) continue;
+                            }
+
                             if (player_skel_esp)
                             {
                                 Render.Render.DrawAllBones(Hacks.Misc.GetAllBones(nb.animator), Settings.Settings.player_esp_color);
                             }
+                            string label = p.Name;
+                            if (player_nameplate_info && Camera.main != null)
+                            {
+                                float dist = Vector3.Distance(Camera.main.transform.position, player.transform.position);
+                                bool isCrawling = false;
+                                try { isCrawling = nb.IsCrawling(); } catch { }
+                                label = $"{p.Name} [{dist:0}m]{(isCrawling ? " [Crawling]" : "")}";
+                            }
 
-                            Render.Render.DrawBoxESP(player, -0.25f, 1.75f, p.Name, Settings.Settings.player_esp_color, player_snapline, player_esp);
+                            Render.Render.DrawBoxESP(player, -0.25f, 1.75f, label, Settings.Settings.player_esp_color, player_snapline, player_esp);
                         }
                     }
                 }
@@ -305,6 +377,12 @@ namespace DevourClient
                     {
                         if (goat != null)
                         {
+                            if (Camera.main != null && (Settings.Settings.espDistanceCulling || Settings.Settings.cullAnimals))
+                            {
+                                float dist = Vector3.Distance(Camera.main.transform.position, goat.transform.position);
+                                float cap = Settings.Settings.cullAnimals ? Settings.Settings.maxDistAnimals : Settings.Settings.espMaxDistance;
+                                if (dist > cap) continue;
+                            }
                             Render.Render.DrawNameESP(goat.transform.position, goat.name.Replace("Survival", "").Replace("(Clone)", ""), new Color(0.94f, 0.61f, 0.18f, 1.0f));
                         }
                     }
@@ -316,6 +394,12 @@ namespace DevourClient
                     {
                         if (obj != null)
                         {
+                            if (Camera.main != null && (Settings.Settings.espDistanceCulling || Settings.Settings.cullItems))
+                            {
+                                float dist = Vector3.Distance(Camera.main.transform.position, obj.transform.position);
+                                float cap = Settings.Settings.cullItems ? Settings.Settings.maxDistItems : Settings.Settings.espMaxDistance;
+                                if (dist > cap) continue;
+                            }
                             Render.Render.DrawNameESP(obj.transform.position, obj.prefabName.Replace("Survival", ""), new Color(1.0f, 1.0f, 1.0f));
                         }
                     }
@@ -324,6 +408,12 @@ namespace DevourClient
                     {
                         if (key != null)
                         {
+                            if (Camera.main != null && (Settings.Settings.espDistanceCulling || Settings.Settings.cullItems))
+                            {
+                                float dist = Vector3.Distance(Camera.main.transform.position, key.transform.position);
+                                float cap = Settings.Settings.cullItems ? Settings.Settings.maxDistItems : Settings.Settings.espMaxDistance;
+                                if (dist > cap) continue;
+                            }
                             Render.Render.DrawNameESP(key.transform.position, "Key", new Color(1.0f, 1.0f, 1.0f));
                         }
                     }
@@ -335,6 +425,12 @@ namespace DevourClient
                     {
                         if (demon != null)
                         {
+                            if (Camera.main != null && (Settings.Settings.espDistanceCulling || Settings.Settings.cullDemons))
+                            {
+                                float dist = Vector3.Distance(Camera.main.transform.position, demon.transform.position);
+                                float cap = Settings.Settings.cullDemons ? Settings.Settings.maxDistDemons : Settings.Settings.espMaxDistance;
+                                if (dist > cap) continue;
+                            }
                             Render.Render.DrawNameESP(demon.transform.position, demon.name.Replace("Survival", "").Replace("(Clone)", ""), new Color(1.0f, 0.0f, 0.0f, 1.0f));
                         }
                     }
@@ -343,6 +439,12 @@ namespace DevourClient
                     {
                         if (spider != null)
                         {
+                            if (Camera.main != null && (Settings.Settings.espDistanceCulling || Settings.Settings.cullDemons))
+                            {
+                                float dist = Vector3.Distance(Camera.main.transform.position, spider.transform.position);
+                                float cap = Settings.Settings.cullDemons ? Settings.Settings.maxDistDemons : Settings.Settings.espMaxDistance;
+                                if (dist > cap) continue;
+                            }
                             Render.Render.DrawNameESP(spider.transform.position, "Spider", new Color(1.0f, 0.0f, 0.0f, 1.0f));
                         }
                     }
@@ -351,6 +453,12 @@ namespace DevourClient
                     {
                         if (ghost != null)
                         {
+                            if (Camera.main != null && (Settings.Settings.espDistanceCulling || Settings.Settings.cullDemons))
+                            {
+                                float dist = Vector3.Distance(Camera.main.transform.position, ghost.transform.position);
+                                float cap = Settings.Settings.cullDemons ? Settings.Settings.maxDistDemons : Settings.Settings.espMaxDistance;
+                                if (dist > cap) continue;
+                            }
                             Render.Render.DrawNameESP(ghost.transform.position, "Ghost", new Color(1.0f, 0.0f, 0.0f, 1.0f));
                         }
                     }
@@ -359,6 +467,12 @@ namespace DevourClient
                     {
                         if (boar != null)
                         {
+                            if (Camera.main != null && (Settings.Settings.espDistanceCulling || Settings.Settings.cullAnimals))
+                            {
+                                float dist = Vector3.Distance(Camera.main.transform.position, boar.transform.position);
+                                float cap = Settings.Settings.cullAnimals ? Settings.Settings.maxDistAnimals : Settings.Settings.espMaxDistance;
+                                if (dist > cap) continue;
+                            }
                             Render.Render.DrawNameESP(boar.transform.position, "Boar", new Color(1.0f, 0.0f, 0.0f, 1.0f));
                         }
                     }
@@ -367,6 +481,12 @@ namespace DevourClient
                     {
                         if (corpse != null)
                         {
+                            if (Camera.main != null && (Settings.Settings.espDistanceCulling || Settings.Settings.cullDemons))
+                            {
+                                float dist = Vector3.Distance(Camera.main.transform.position, corpse.transform.position);
+                                float cap = Settings.Settings.cullDemons ? Settings.Settings.maxDistDemons : Settings.Settings.espMaxDistance;
+                                if (dist > cap) continue;
+                            }
                             Render.Render.DrawNameESP(corpse.transform.position, "Corpse", new Color(1.0f, 0.0f, 0.0f, 1.0f));
                         }
                     }
@@ -375,6 +495,12 @@ namespace DevourClient
                     {
                         if (crow != null)
                         {
+                            if (Camera.main != null && (Settings.Settings.espDistanceCulling || Settings.Settings.cullAnimals))
+                            {
+                                float dist = Vector3.Distance(Camera.main.transform.position, crow.transform.position);
+                                float cap = Settings.Settings.cullAnimals ? Settings.Settings.maxDistAnimals : Settings.Settings.espMaxDistance;
+                                if (dist > cap) continue;
+                            }
                             Render.Render.DrawNameESP(crow.transform.position, "Crow", new Color(1.0f, 0.0f, 0.0f, 1.0f));
                         }
                     }
@@ -383,6 +509,12 @@ namespace DevourClient
                     {
                         if (lump != null)
                         {
+                            if (Camera.main != null && (Settings.Settings.espDistanceCulling || Settings.Settings.cullDemons))
+                            {
+                                float dist = Vector3.Distance(Camera.main.transform.position, lump.transform.position);
+                                float cap = Settings.Settings.cullDemons ? Settings.Settings.maxDistDemons : Settings.Settings.espMaxDistance;
+                                if (dist > cap) continue;
+                            }
                             Render.Render.DrawNameESP(lump.transform.position, "Lump", new Color(1.0f, 0.0f, 0.0f, 1.0f));
                         }
                     }
@@ -394,6 +526,12 @@ namespace DevourClient
                     {
                         if (survivalAzazel != null)
                         {
+                            if (Camera.main != null && (Settings.Settings.espDistanceCulling || Settings.Settings.cullAzazel))
+                            {
+                                float dist = Vector3.Distance(Camera.main.transform.position, survivalAzazel.transform.position);
+                                float cap = Settings.Settings.cullAzazel ? Settings.Settings.maxDistAzazel : Settings.Settings.espMaxDistance;
+                                if (dist > cap) continue;
+                            }
                             if (azazel_skel_esp)
                             {
                                 Render.Render.DrawAllBones(Hacks.Misc.GetAllBones(survivalAzazel.animator), Settings.Settings.azazel_esp_color);
@@ -651,11 +789,13 @@ namespace DevourClient
 
         private static void MapSpecificTab()
         {
-            if (GUI.Button(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 70, 150, 30), "Instant Win") && Player.IsInGame() && BoltNetwork.IsSinglePlayer)
+            Rect instantWinRect = new Rect(Settings.Settings.x + 10, Settings.Settings.y + 70, 150, 30);
+            if (GUI.Button(instantWinRect, "Instant Win") && Player.IsInGame() && BoltNetwork.IsSinglePlayer)
             {
                 Hacks.Misc.InstantWin();
                 MelonLogger.Msg("EZ Win");
             }
+            Helpers.GUIHelper.Tooltip(instantWinRect, "Risky: triggers the end state for current map. Singleplayer only.");
 
             if (GUI.Button(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 110, 150, 30), "Burn a ritual object"))
             {
@@ -918,13 +1058,48 @@ namespace DevourClient
             }
 
             GUI.enabled = true;
+            // Region selection for server creation
+            GUI.Label(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 270, 150, 20), "Region: 0=Best,1=US,2=EU,3=AS,4=AU");
+            Settings.Settings.lobbyRegionIndex = (int)GUI.HorizontalSlider(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 290, 120, 10), Settings.Settings.lobbyRegionIndex, 0, 4);
         }
 
         private static void EspTab()
         {
-            player_esp = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 70, 150, 20), player_esp, "Player ESP");
-            player_skel_esp = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 100, 150, 20), player_skel_esp, "Skeleton ESP");
-            player_snapline = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 130, 150, 20), player_snapline, "Player Snapline");
+            // Left column (players/Azazel)
+            player_esp = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 70, 180, 22), player_esp, "Player ESP");
+            player_skel_esp = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 96, 180, 22), player_skel_esp, "Skeleton ESP");
+            player_snapline = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 122, 180, 22), player_snapline, "Player Snapline");
+            player_nameplate_info = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 148, 260, 22), player_nameplate_info, "Nameplates: distance and crawling");
+            Settings.Settings.espDistanceCulling = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 160, 200, 20), Settings.Settings.espDistanceCulling, "Enable distance culling");
+            Settings.Settings.espMaxDistance = GUI.HorizontalSlider(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 180, 140, 12), Settings.Settings.espMaxDistance, 25f, 300f);
+            GUI.Label(new Rect(Settings.Settings.x + 160, Settings.Settings.y + 176, 160, 20), $"Max {Settings.Settings.espMaxDistance:0}m");
+            Settings.Settings.espDrawIntervalMs = GUI.HorizontalSlider(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 200, 140, 12), Settings.Settings.espDrawIntervalMs, 0f, 100f);
+            GUI.Label(new Rect(Settings.Settings.x + 160, Settings.Settings.y + 196, 200, 20), $"Draw every {Settings.Settings.espDrawIntervalMs:0}ms");
+            if (GUI.Button(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 225, 120, 20), Settings.Settings.espToggleKey == KeyCode.None ? "ESP Hotkey: None" : $"ESP Hotkey: {Settings.Settings.espToggleKey}"))
+            {
+                captureEspKey = true;
+            }
+            // Middle column (per-category culling)
+            int leftX = (int)Settings.Settings.x + 300;
+            Settings.Settings.cullPlayers = GUI.Toggle(new Rect(leftX, Settings.Settings.y + 70, 180, 20), Settings.Settings.cullPlayers, "Cull players");
+            Settings.Settings.maxDistPlayers = GUI.HorizontalSlider(new Rect(leftX, Settings.Settings.y + 90, 140, 12), Settings.Settings.maxDistPlayers, 25f, 300f);
+            GUI.Label(new Rect(leftX + 150, Settings.Settings.y + 86, 100, 20), $"{Settings.Settings.maxDistPlayers:0}m");
+
+            Settings.Settings.cullAzazel = GUI.Toggle(new Rect(leftX, Settings.Settings.y + 110, 180, 20), Settings.Settings.cullAzazel, "Cull Azazel");
+            Settings.Settings.maxDistAzazel = GUI.HorizontalSlider(new Rect(leftX, Settings.Settings.y + 130, 140, 12), Settings.Settings.maxDistAzazel, 25f, 400f);
+            GUI.Label(new Rect(leftX + 150, Settings.Settings.y + 126, 100, 20), $"{Settings.Settings.maxDistAzazel:0}m");
+
+            Settings.Settings.cullItems = GUI.Toggle(new Rect(leftX, Settings.Settings.y + 150, 180, 20), Settings.Settings.cullItems, "Cull items");
+            Settings.Settings.maxDistItems = GUI.HorizontalSlider(new Rect(leftX, Settings.Settings.y + 170, 140, 12), Settings.Settings.maxDistItems, 25f, 300f);
+            GUI.Label(new Rect(leftX + 150, Settings.Settings.y + 166, 100, 20), $"{Settings.Settings.maxDistItems:0}m");
+
+            Settings.Settings.cullAnimals = GUI.Toggle(new Rect(leftX, Settings.Settings.y + 190, 180, 20), Settings.Settings.cullAnimals, "Cull animals");
+            Settings.Settings.maxDistAnimals = GUI.HorizontalSlider(new Rect(leftX, Settings.Settings.y + 210, 140, 12), Settings.Settings.maxDistAnimals, 25f, 300f);
+            GUI.Label(new Rect(leftX + 150, Settings.Settings.y + 206, 100, 20), $"{Settings.Settings.maxDistAnimals:0}m");
+
+            Settings.Settings.cullDemons = GUI.Toggle(new Rect(leftX, Settings.Settings.y + 230, 180, 20), Settings.Settings.cullDemons, "Cull demons");
+            Settings.Settings.maxDistDemons = GUI.HorizontalSlider(new Rect(leftX, Settings.Settings.y + 250, 140, 12), Settings.Settings.maxDistDemons, 25f, 400f);
+            GUI.Label(new Rect(leftX + 150, Settings.Settings.y + 246, 100, 20), $"{Settings.Settings.maxDistDemons:0}m");
             if (GUI.Button(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 160, 130, 30), "Player ESP Color"))
             {
                 player_esp_colorpick = !player_esp_colorpick;
@@ -936,10 +1111,12 @@ namespace DevourClient
                 Settings.Settings.player_esp_color = player_esp_color_input;
             }
 
-            azazel_esp = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 200, 150, 20), azazel_esp, "Azazel ESP");
-            azazel_skel_esp = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 230, 150, 20), azazel_skel_esp, "Skeleton ESP");
-            azazel_snapline = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 260, 150, 20), azazel_snapline, "Azazel Snapline");
-            if (GUI.Button(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 290, 130, 30), "Azazel ESP Color"))
+            // Right column (Azazel)
+            int rightX = (int)Settings.Settings.x + 540;
+            azazel_esp = GUI.Toggle(new Rect(rightX, Settings.Settings.y + 70, 160, 20), azazel_esp, "Azazel ESP");
+            azazel_skel_esp = GUI.Toggle(new Rect(rightX, Settings.Settings.y + 92, 160, 20), azazel_skel_esp, "Skeleton ESP");
+            azazel_snapline = GUI.Toggle(new Rect(rightX, Settings.Settings.y + 114, 160, 20), azazel_snapline, "Azazel Snapline");
+            if (GUI.Button(new Rect(rightX, Settings.Settings.y + 140, 140, 26), "Azazel ESP Color"))
             {
                 azazel_esp_colorpick = !azazel_esp_colorpick;
             }
@@ -950,9 +1127,9 @@ namespace DevourClient
                 Settings.Settings.azazel_esp_color = azazel_esp_color_input;
             }
 
-            item_esp = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 330, 150, 20), item_esp, "Item ESP");
-            goat_rat_esp = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 360, 150, 20), goat_rat_esp, "Goat/Rat ESP");
-            demon_esp = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 390, 150, 20), demon_esp, "Demon ESP");
+            item_esp = GUI.Toggle(new Rect(rightX, Settings.Settings.y + 180, 160, 20), item_esp, "Item ESP");
+            goat_rat_esp = GUI.Toggle(new Rect(rightX, Settings.Settings.y + 202, 160, 20), goat_rat_esp, "Goat/Rat ESP");
+            demon_esp = GUI.Toggle(new Rect(rightX, Settings.Settings.y + 224, 160, 20), demon_esp, "Demon ESP");
         }
 
         private static void ItemsTab()
@@ -1383,7 +1560,8 @@ namespace DevourClient
         {
             // Cosmetic unlock toggle
             unlockCosmeticsEnabled = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 40, 200, 20), unlockCosmeticsEnabled, "Unlock cosmetics (menu)");
-            if (GUI.Button(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 70, 150, 30), "Unlock Achievements"))
+            Rect unlockBtnRect = new Rect(Settings.Settings.x + 10, Settings.Settings.y + 70, 150, 30);
+            if (GUI.Button(unlockBtnRect, "Unlock Achievements"))
             {
                 // Require Shift held to confirm
                 if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
@@ -1397,6 +1575,7 @@ namespace DevourClient
                     MelonLogger.Warning("Hold SHIFT and click to confirm achievements unlock.");
                 }
             }
+            Helpers.GUIHelper.Tooltip(unlockBtnRect, "Risky: permanently sets many Steam stats/achievements. Hold SHIFT to confirm.");
 
             if (GUI.Button(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 110, 150, 30), "Unlock Doors"))
             {
@@ -1418,8 +1597,8 @@ namespace DevourClient
             }
 
             spam_message = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 240, 140, 30), spam_message, "Chat spam");
-            Settings.Settings.spamIntervalSeconds = GUI.HorizontalSlider(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 270, 100, 10), Settings.Settings.spamIntervalSeconds, 0.1f, 3.0f);
-            GUI.Label(new Rect(Settings.Settings.x + 120, Settings.Settings.y + 265, 150, 30), $"Spam every {Settings.Settings.spamIntervalSeconds:0.0}s");
+            Settings.Settings.spamIntervalSeconds = GUI.HorizontalSlider(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 270, 120, 12), Settings.Settings.spamIntervalSeconds, 0.1f, 3.0f);
+            GUI.Label(new Rect(Settings.Settings.x + 140, Settings.Settings.y + 265, 180, 20), $"Spam every {Settings.Settings.spamIntervalSeconds:0.0}s");
             _spamIntervalSeconds = Settings.Settings.spamIntervalSeconds;
             change_steam_name = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 270, 140, 30), change_steam_name, "Change Steam Name");
             change_server_name = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 300, 140, 30), change_server_name, "Change Server Name");
@@ -1429,38 +1608,59 @@ namespace DevourClient
             fly = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 400, 40, 20), fly, "Fly");
             if (GUI.Button(new Rect(Settings.Settings.x + 60, Settings.Settings.y + 400, 40, 20), Settings.Settings.flyKey.ToString()))
             {
-                Settings.Settings.flyKey = Settings.Settings.GetKey();
+                captureFlyKey = true;
             }
 
             fly_speed = GUI.HorizontalSlider(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 430, 100, 10), fly_speed, 5f, 20f);
             GUI.Label(new Rect(Settings.Settings.x + 120, Settings.Settings.y + 425, 100, 30), ((int)fly_speed).ToString());
 
 
-            spoofLevel = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 470, 150, 20), spoofLevel, "Spoof Level");
-            spoofLevelValue = GUI.HorizontalSlider(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 500, 100, 10), spoofLevelValue, 0f, 666f);
-            GUI.Label(new Rect(Settings.Settings.x + 120, Settings.Settings.y + 495, 100, 30), ((int)spoofLevelValue).ToString());
+            // Risky group (collapsed by default)
+            showRiskySection = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 450, 180, 20), showRiskySection, "Show Risky (Profile & EXP)");
+            Rect expRiskRect1 = new Rect(Settings.Settings.x + 10, Settings.Settings.y + 470, 150, 20);
+            Rect expRiskRect2 = new Rect(Settings.Settings.x + 10, Settings.Settings.y + 540, 150, 20);
+            if (showRiskySection)
+            {
+                spoofLevel = GUI.Toggle(expRiskRect1, spoofLevel, "Spoof Level");
+                spoofLevelValue = GUI.HorizontalSlider(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 500, 120, 12), spoofLevelValue, 0f, 666f);
+                GUI.Label(new Rect(Settings.Settings.x + 140, Settings.Settings.y + 495, 100, 20), ((int)spoofLevelValue).ToString());
 
+                exp_modifier = GUI.Toggle(expRiskRect2, exp_modifier, "EXP Modifier");
+                exp = GUI.HorizontalSlider(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 570, 120, 12), exp, 1000f, 3000f);
+                GUI.Label(new Rect(Settings.Settings.x + 140, Settings.Settings.y + 565, 100, 20), ((int)exp).ToString());
 
-            exp_modifier = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 540, 150, 20), exp_modifier, "EXP Modifier");
-            exp = GUI.HorizontalSlider(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 570, 100, 10), exp, 1000f, 3000f);
-            GUI.Label(new Rect(Settings.Settings.x + 120, Settings.Settings.y + 565, 100, 30), ((int)exp).ToString());
+                Helpers.GUIHelper.Tooltip(expRiskRect1, "Risky: may persist in profile.");
+                Helpers.GUIHelper.Tooltip(expRiskRect2, "Risky: changes EXP at end, persistent.");
+            }
 
 
             fastMove = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 610, 150, 20), fastMove, "Player Speed");
+            if (GUI.Button(new Rect(Settings.Settings.x + 165, Settings.Settings.y + 610, 60, 20), Settings.Settings.speedToggleKey == KeyCode.None ? "Key:None" : $"Key:{Settings.Settings.speedToggleKey}"))
+            {
+                captureSpeedKey = true;
+            }
             _PlayerSpeedMultiplier = GUI.HorizontalSlider(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 640, 100, 10), _PlayerSpeedMultiplier, (int)1f, (int)10f);
             GUI.Label(new Rect(Settings.Settings.x + 120, Settings.Settings.y + 635, 100, 30), ((int)_PlayerSpeedMultiplier).ToString());
 
-            GUI.Label(new Rect(Settings.Settings.x + 295, Settings.Settings.y + 70, 150, 30), "Max players");
-            Settings.Settings.privateLobby = GUI.Toggle(new Rect(Settings.Settings.x + 295, Settings.Settings.y + 50, 150, 20), Settings.Settings.privateLobby, "Private lobby");
-            lobbySize = GUI.HorizontalSlider(new Rect(Settings.Settings.x + 295, Settings.Settings.y + 90, 100, 10), lobbySize, (int)0f, (int)30f);
-            GUI.Label(new Rect(Settings.Settings.x + 405, Settings.Settings.y + 85, 100, 30), ((int)lobbySize).ToString());
-
-            if (GUI.Button(new Rect(Settings.Settings.x + 285, Settings.Settings.y + 110, 150, 30), "Create server"))
+            // Lobby/Host group (collapsed by default)
+            showLobbySection = GUI.Toggle(new Rect(Settings.Settings.x + 300, Settings.Settings.y + 50, 160, 20), showLobbySection, "Show Lobby & Host");
+            if (showLobbySection)
             {
-                MelonLogger.Msg("Creating the server...");
-                Hacks.Misc.CreateCustomizedLobby((int)lobbySize, Settings.Settings.privateLobby);
-                MelonLogger.Msg("Done !");
+                GUI.Label(new Rect(Settings.Settings.x + 300, Settings.Settings.y + 70, 150, 20), "Max players");
+                Settings.Settings.privateLobby = GUI.Toggle(new Rect(Settings.Settings.x + 300, Settings.Settings.y + 90, 150, 20), Settings.Settings.privateLobby, "Private lobby");
+                lobbySize = GUI.HorizontalSlider(new Rect(Settings.Settings.x + 300, Settings.Settings.y + 112, 140, 12), lobbySize, (int)0f, (int)30f);
+                GUI.Label(new Rect(Settings.Settings.x + 450, Settings.Settings.y + 108, 60, 20), ((int)lobbySize).ToString());
+
+                if (GUI.Button(new Rect(Settings.Settings.x + 300, Settings.Settings.y + 134, 150, 26), "Create server"))
+                {
+                    MelonLogger.Msg("Creating the server...");
+                    Hacks.Misc.CreateCustomizedLobby((int)lobbySize, Settings.Settings.privateLobby);
+                    MelonLogger.Msg("Done !");
+                }
             }
+
+            Helpers.GUIHelper.DrawTooltip();
+            Helpers.GUIHelper.DrawTooltip();
         }
 
         private static void PlayersTab()
@@ -1477,7 +1677,8 @@ namespace DevourClient
                         continue;
                     }
 
-                    GUI.Label(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 110 + i, 150, 30), bp.Name);
+                    string display = string.IsNullOrEmpty(bp.Id) ? bp.Name : $"{bp.Name} [{bp.Id}]";
+                    GUI.Label(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 110 + i, 250, 30), display);
 
                     GUI.enabled = BoltNetwork.IsServer;
                     if (GUI.Button(new Rect(Settings.Settings.x + 70, Settings.Settings.y + 105 + i, 60, 30), "Kill"))
@@ -1520,6 +1721,15 @@ namespace DevourClient
                             bp.ShootPlayer();
                         }
                         GUI.enabled = true;
+                    }
+
+                    if (GUI.Button(new Rect(Settings.Settings.x + 690, Settings.Settings.y + 105 + i, 80, 30), "Copy ID"))
+                    {
+                        if (!string.IsNullOrEmpty(bp.Id))
+                        {
+                            GUIUtility.systemCopyBuffer = bp.Id;
+                            MelonLogger.Msg($"Copied ID for {bp.Name}");
+                        }
                     }
 
                     i += 30;

@@ -235,7 +235,31 @@ namespace DevourClient.Hacks
 			Il2CppHorror.Menu _menu = UnityEngine.Object.FindObjectOfType<Il2CppHorror.Menu>();
 
 			Il2CppUdpKit.Platform.PhotonPlatformConfig __photonPlatformConfig = new Il2CppUdpKit.Platform.PhotonPlatformConfig();
-            __photonPlatformConfig.Region = Il2CppUdpKit.Platform.Photon.PhotonRegion.regions[__region];
+            // Choose region by Settings if provided
+            try
+            {
+                // PhotonRegion.regions is a Dictionary<Regions, PhotonRegion>; pick key by index or fallback
+                var regionsDict = Il2CppUdpKit.Platform.Photon.PhotonRegion.regions;
+                Il2CppUdpKit.Platform.Photon.PhotonRegion.Regions chosen = __region;
+                if (Settings.Settings.lobbyRegionIndex >= 0 && Settings.Settings.lobbyRegionIndex < regionsDict.Count)
+                {
+                    int idx = 0;
+                    foreach (var kv in regionsDict)
+                    {
+                        if (idx == Settings.Settings.lobbyRegionIndex)
+                        {
+                            chosen = kv.Key;
+                            break;
+                        }
+                        idx++;
+                    }
+                }
+                __photonPlatformConfig.Region = regionsDict[chosen];
+            }
+            catch
+            {
+                __photonPlatformConfig.Region = Il2CppUdpKit.Platform.Photon.PhotonRegion.regions[__region];
+            }
 
 			BoltLauncher.SetUdpPlatform(new Il2CppUdpKit.Platform.PhotonPlatform(__photonPlatformConfig));
 
