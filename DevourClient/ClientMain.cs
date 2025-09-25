@@ -10,6 +10,7 @@ namespace DevourClient
 {
     public class ClientMain : MonoBehaviour
     {
+        public static bool unlockCosmeticsEnabled = false;
         public ClientMain(System.IntPtr ptr)
             : base(ptr)
         {
@@ -72,6 +73,9 @@ namespace DevourClient
         {
             MelonLogger.Msg("DevourClient loaded!");
             MelonLogger.Msg("Press INSERT to open the menu");
+            // Load preferences
+            Settings.Settings.InitializePreferences();
+            _spamIntervalSeconds = Settings.Settings.spamIntervalSeconds;
         }
 
         public void Start()
@@ -1377,12 +1381,21 @@ namespace DevourClient
 
         private static void MiscTab()
         {
+            // Cosmetic unlock toggle
+            unlockCosmeticsEnabled = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 40, 200, 20), unlockCosmeticsEnabled, "Unlock cosmetics (menu)");
             if (GUI.Button(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 70, 150, 30), "Unlock Achievements"))
             {
-                Thread AchievementsThread = new Thread(new ThreadStart(Hacks.Unlock.Achievements));
-                AchievementsThread.Start();
-
-                MelonLogger.Msg("Achievements Unlocked!");
+                // Require Shift held to confirm
+                if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
+                {
+                    Thread AchievementsThread = new Thread(new ThreadStart(Hacks.Unlock.Achievements));
+                    AchievementsThread.Start();
+                    MelonLogger.Msg("Achievements Unlocked!");
+                }
+                else
+                {
+                    MelonLogger.Warning("Hold SHIFT and click to confirm achievements unlock.");
+                }
             }
 
             if (GUI.Button(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 110, 150, 30), "Unlock Doors"))
@@ -1405,6 +1418,9 @@ namespace DevourClient
             }
 
             spam_message = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 240, 140, 30), spam_message, "Chat spam");
+            Settings.Settings.spamIntervalSeconds = GUI.HorizontalSlider(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 270, 100, 10), Settings.Settings.spamIntervalSeconds, 0.1f, 3.0f);
+            GUI.Label(new Rect(Settings.Settings.x + 120, Settings.Settings.y + 265, 150, 30), $"Spam every {Settings.Settings.spamIntervalSeconds:0.0}s");
+            _spamIntervalSeconds = Settings.Settings.spamIntervalSeconds;
             change_steam_name = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 270, 140, 30), change_steam_name, "Change Steam Name");
             change_server_name = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 300, 140, 30), change_server_name, "Change Server Name");
             _walkInLobby = GUI.Toggle(new Rect(Settings.Settings.x + 10, Settings.Settings.y + 330, 140, 30), _walkInLobby, "Walk In Lobby");
@@ -1435,13 +1451,14 @@ namespace DevourClient
             GUI.Label(new Rect(Settings.Settings.x + 120, Settings.Settings.y + 635, 100, 30), ((int)_PlayerSpeedMultiplier).ToString());
 
             GUI.Label(new Rect(Settings.Settings.x + 295, Settings.Settings.y + 70, 150, 30), "Max players");
+            Settings.Settings.privateLobby = GUI.Toggle(new Rect(Settings.Settings.x + 295, Settings.Settings.y + 50, 150, 20), Settings.Settings.privateLobby, "Private lobby");
             lobbySize = GUI.HorizontalSlider(new Rect(Settings.Settings.x + 295, Settings.Settings.y + 90, 100, 10), lobbySize, (int)0f, (int)30f);
             GUI.Label(new Rect(Settings.Settings.x + 405, Settings.Settings.y + 85, 100, 30), ((int)lobbySize).ToString());
 
             if (GUI.Button(new Rect(Settings.Settings.x + 285, Settings.Settings.y + 110, 150, 30), "Create server"))
             {
                 MelonLogger.Msg("Creating the server...");
-                Hacks.Misc.CreateCustomizedLobby((int)lobbySize);
+                Hacks.Misc.CreateCustomizedLobby((int)lobbySize, Settings.Settings.privateLobby);
                 MelonLogger.Msg("Done !");
             }
         }

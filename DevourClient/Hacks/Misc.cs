@@ -203,12 +203,29 @@ namespace DevourClient.Hacks
 		}
 		public static void TPItems()
         {
-            Il2Cpp.NolanBehaviour Nolan = Player.GetPlayer();
+			// Host or singleplayer only: avoid desync by moving networked items as a client
+			if (!BoltNetwork.IsServer && !BoltNetwork.IsSinglePlayer)
+			{
+				MelonLogger.Msg("You need to be server !");
+				return;
+			}
 
-            foreach (Il2Cpp.SurvivalInteractable item in Helpers.Entities.SurvivalInteractables)
-            {
-                item.transform.position = Nolan.transform.position + Nolan.transform.forward * UnityEngine.Random.RandomRange(1f, 3f);
-            }
+			Il2Cpp.NolanBehaviour Nolan = Player.GetPlayer();
+			if (Nolan == null)
+			{
+				return;
+			}
+
+			if (Helpers.Entities.SurvivalInteractables == null)
+			{
+				return;
+			}
+
+			foreach (Il2Cpp.SurvivalInteractable item in Helpers.Entities.SurvivalInteractables)
+			{
+				if (item == null) continue;
+				item.transform.position = Nolan.transform.position + Nolan.transform.forward * UnityEngine.Random.RandomRange(1f, 3f);
+			}
 		}
 	    
 		public static void CreateCustomizedLobby(int lobbySize = 4, bool isPrivate = false, Il2CppUdpKit.Platform.Photon.PhotonRegion.Regions __region = Il2CppUdpKit.Platform.Photon.PhotonRegion.Regions.BEST_REGION)
@@ -379,13 +396,28 @@ namespace DevourClient.Hacks
 		public static void TPKeys()
         {
 			//TOFIX: spawn manually the missing key in slaughterhouse
+			if (!BoltNetwork.IsServer && !BoltNetwork.IsSinglePlayer)
+			{
+				MelonLogger.Msg("You need to be server !");
+				return;
+			}
+
 			Il2Cpp.NolanBehaviour Nolan = Player.GetPlayer();
+			if (Nolan == null)
+			{
+				return;
+			}
+
+			if (Helpers.Entities.Keys == null)
+			{
+				return;
+			}
 
 			foreach (Il2Cpp.KeyBehaviour keyBehaviour in Helpers.Entities.Keys)
 			{
 				if (keyBehaviour == null)
 				{
-					return;
+					continue;
 				}
 				keyBehaviour.transform.position = Nolan.transform.position + Nolan.transform.forward * 1.5f;
 			}
@@ -599,6 +631,13 @@ namespace DevourClient.Hacks
 		{
 			if (Helpers.Map.GetActiveScene() == "Menu")
 			{
+				return;
+			}
+
+			// Host or singleplayer only; otherwise this likely won't have authority
+			if (!BoltNetwork.IsServer && !BoltNetwork.IsSinglePlayer)
+			{
+				MelonLogger.Msg("You need to be server !");
 				return;
 			}
 

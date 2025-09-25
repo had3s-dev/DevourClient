@@ -30,6 +30,10 @@
         
         public static UnityEngine.GameObject GetAzazel()
         {
+            if (Helpers.Entities.Azazels == null || Helpers.Entities.Azazels.Length == 0 || Helpers.Entities.Azazels[0] == null)
+            {
+                return null;
+            }
             return Helpers.Entities.Azazels[0].gameObject;
         }
         

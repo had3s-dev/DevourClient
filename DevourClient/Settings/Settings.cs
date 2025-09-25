@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Threading;
+using MelonLoader;
 
 namespace DevourClient.Settings
 {
@@ -19,6 +20,8 @@ namespace DevourClient.Settings
         public static Vector2 itemsScrollPosition = Vector2.zero;
         public static Vector2 rituelObjectsScrollPosition = Vector2.zero;
         public static Vector2 stuffsScrollPosition = Vector2.zero;
+        public static float spamIntervalSeconds = 0.5f;
+        public static bool privateLobby = false;
         
         public static KeyCode GetKey()
         {
@@ -35,6 +38,32 @@ namespace DevourClient.Settings
             }
 
             return KeyCode.None;
+        }
+
+        // Preferences
+        private static MelonPreferences_Entry<float> PrefSpamInterval = default!;
+        private static MelonPreferences_Entry<bool> PrefPrivateLobby = default!;
+        private static MelonPreferences_Entry<bool> PrefUnlockCosmetics = default!;
+
+        public static void InitializePreferences()
+        {
+            var cat = MelonPreferences.CreateCategory("DevourClient", "DevourClient");
+
+            PrefSpamInterval = MelonPreferences.CreateEntry("DevourClient", "SpamIntervalSeconds", 0.5f, "Chat spam interval (seconds)");
+            PrefPrivateLobby = MelonPreferences.CreateEntry("DevourClient", "DefaultPrivateLobby", false, "Default Private Lobby");
+            PrefUnlockCosmetics = MelonPreferences.CreateEntry("DevourClient", "UnlockCosmetics", false, "Unlock cosmetics in menu");
+
+            spamIntervalSeconds = PrefSpamInterval.Value;
+            privateLobby = PrefPrivateLobby.Value;
+            DevourClient.ClientMain.unlockCosmeticsEnabled = PrefUnlockCosmetics.Value;
+        }
+
+        public static void SavePreferences()
+        {
+            if (PrefSpamInterval != null) PrefSpamInterval.Value = spamIntervalSeconds;
+            if (PrefPrivateLobby != null) PrefPrivateLobby.Value = privateLobby;
+            if (PrefUnlockCosmetics != null) PrefUnlockCosmetics.Value = DevourClient.ClientMain.unlockCosmeticsEnabled;
+            MelonPreferences.Save();
         }
     }
 }

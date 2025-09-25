@@ -40,6 +40,7 @@ namespace DevourClient.Hooks
         {
             static void Prefix(ref Il2Cpp.CharacterPerk perk)
             {
+                if (!DevourClient.ClientMain.unlockCosmeticsEnabled) return;
                 /*
                     public int cost { get; set; }
                     public bool isOwned { get; set; }
@@ -62,6 +63,7 @@ namespace DevourClient.Hooks
         {
             static void Prefix(ref Il2Cpp.CharacterOutfit outfit)
             {
+                if (!DevourClient.ClientMain.unlockCosmeticsEnabled) return;
                 /*
                     public ulong currentPrice;
 	                public ulong basePrice;
@@ -85,6 +87,7 @@ namespace DevourClient.Hooks
         {
             static bool Prefix(ref string robe)
             {
+                if (!DevourClient.ClientMain.unlockCosmeticsEnabled) return true;
                 //MelonLoader.MelonLogger.Msg("robe : " + robe);
 
                 robe = "Default";
@@ -98,6 +101,7 @@ namespace DevourClient.Hooks
         {
             static void Prefix(Il2Cpp.CharacterFlashlight flashlight)
             {
+                if (!DevourClient.ClientMain.unlockCosmeticsEnabled) return;
                 /*
                 public bool isHidden { get; set; }
                 public int cost { get; set; }

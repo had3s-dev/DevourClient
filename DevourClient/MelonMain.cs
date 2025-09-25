@@ -35,5 +35,10 @@ namespace DevourClient
         {
             Init();
         }
+
+        public override void OnDeinitializeMelon()
+        {
+            Settings.Settings.SavePreferences();
+        }
     }
 }
